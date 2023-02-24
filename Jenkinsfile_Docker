@@ -1,0 +1,72 @@
+pipeline{
+  environment {
+    registry = "jeaggrey/spring-boot-mongo" //Replace with your registry 
+    registryCredential = 'DockerHubCred' //Credential name in Jenkins for Dockerhub
+    dockerImage = ''
+  }
+  agent any 
+  tools {
+    maven "maven3.8.6" //Pick Maven Version
+  }  
+  stages {
+    stage('1GetCode'){
+      steps{
+        sh "echo 'cloning the latest application version' "
+      //  git credentialsId: 'GithubCred', url: 'https://github.com/JoetechDev/jowebapp.git' //Use your own github account link
+       git branch: 'master', credentialsId: 'GithubCred', url: 'https://github.com/jeaggrey/spring-boot-mongo-docker.git'
+    //  git 'https://github.com/JoetechDev/jowebapp'
+      }
+    }
+    stage('3Test+Build'){
+      steps{
+        sh "echo 'running JUnit-test-cases' "
+        sh "echo 'testing must passed to create artifacts ' "
+        sh 'mvn clean package'
+      }
+    }
+//   stage('4CodeQuality'){
+//        steps{
+//          sh "echo 'Perfoming CodeQualityAnalysis' "   //currently commented out
+//          sh "mvn sonar:sonar"
+//        }
+//     }
+//    stage('5uploadNexus'){
+//       steps{
+//         sh "mvn deploy"
+//       }
+//     } 
+
+ stage('6BuildImage'){
+      steps{
+
+      script {
+        dockerImage = docker.build registry + ":$BUILD_NUMBER" //use build number as image tag 
+        //$BUILD_NUMBER variable is used as tag for docker image 
+      }   
+      sh "echo 'Building Docker Image' "
+       
+      }
+    }
+     stage('7PushImage'){
+      steps{
+      script {
+        docker.withRegistry( '', registryCredential )
+        {
+        dockerImage.push()
+       }  
+      }  
+        sh "echo 'Pushed  Docker Image'"
+       }
+    }
+//  stage('8Updating Manifest') {
+//        steps {
+//          script {
+//          echo "triggering updatemanifestjob"
+//                 build job: 'manifestupd', parameters: [string(name: 'DOCKERTAG', value: env.BUILD_NUMBER)] 
+//                 // "manifestupd" name of second jenkins job that is triggered , second Job is parameterized and env.BUILD_NUMBER is inputed as parameter  DOCKERTAG  
+//          }
+//        }
+//      }
+
+  }
+}
